@@ -1,0 +1,122 @@
+---
+title: "Student Assistant Task"
+output: html_document
+date: "2024-06-28"
+---
+
+```{r}
+#loading packages
+
+library(dplyr)
+library(readxl)
+library("xlsx")
+library(tidyverse)
+library(ggplot2)
+library(sandwich)
+library(knitr)
+
+# github_repo <- https://github.com/norachirikure/SA_task
+
+```
+
+#1.1 Read Data 
+
+```{r}
+
+CSES <- read.csv("A_CSES.csv")
+QoG <- read_excel("B_QoG.xlsx")
+```
+
+#1.2 Clean Data 
+
+```{r}
+
+length(unique(CSES$B1006_NAM))
+#list(unique(CSES$B1006_NAM))
+
+list(unique(QoG$cname))
+length(unique(QoG$cname))
+
+#there are 5 countries in a CSES named differently than in QoG 
+#so i need to check which names in CSES do not have a match in QoG 
+
+
+unmatched <- setdiff(unique(CSES$B1006_NAM), unique(QoG$cname))
+print(unmatched)
+
+new_names <- c( "France (1963-)" = "France",  "United Kingdom" = "Great Britain" , 
+                  "Korea, North" = "Republic of Korea" ,  "Russia" = "Russian Federation", 
+                  "United States" = "United States of America" )
+
+QoG <- QoG %>%
+  mutate(cname = ifelse(cname %in% names(new_names), new_names[cname], cname))
+
+#check 
+setdiff(unique(CSES$B1006_NAM), unique(QoG$cname))
+```
+#1.3 Merge Data 
+
+```{r}
+#dim 
+dim(CSES)
+dim(QoG)
+
+#rename variable names 
+CSES$country <- CSES$B1006_NAM
+CSES$year <- CSES$B1008
+QoG$country <- QoG$cname
+
+merged_df <- left_join(CSES, QoG, by = c("country", "year"))
+dim(merged_df)
+  
+```
+#2 Descriptive statistics
+
+##2.1 Summary Statistics 
+
+```{r}
+
+summary_df <- merged_df %>%
+  group_by(country, year) %>%
+  summarise(
+    total_respondents = sum(!is.na(B2005)),
+    union_membership_percentage = (sum(B2005 == 1) / total_respondents) * 100,
+    gdp_per_capita = mean(gle_cgdpc)
+  )
+
+```
+
+## 2.2 Display table
+
+```{r}
+
+kable(summary_df)
+
+```
+
+# 3 Analysis
+
+```{r}
+
+ggplot(summary_df, aes(x = union_membership_percentage, y = gdp_per_capita)) +
+  geom_point() +
+  labs(
+    title = "Scatterplot of Union Membership Percentage vs GDP per Capita",
+    x = "Union Membership Percentage",
+    y = "GDP per Capita"
+  ) +
+  theme_minimal()
+
+```
+
+
+## 3.2 Regression
+
+```{r}
+ols_model <- lm(union_membership_percentage ~ year, data = summary_df)
+summary(ols_model)
+```
+
+# 4 Editing
+
+
